@@ -1,0 +1,60 @@
+version: v1alpha1
+# Multi-Datacenter Distributed Message Broker Topology Specification
+# Designed for declarative reconciliation inspired by Kubernetes Operators & HashiCorp Terraform
+
+brokers:
+  - id: broker-mum-01
+    host: 10.14.1.10
+    port: 9092
+    zone: ap-south-1a-mumbai
+
+  - id: broker-mum-02
+    host: 10.14.1.11
+    port: 9092
+    zone: ap-south-1a-mumbai
+
+  - id: broker-blr-01
+    host: 10.15.2.20
+    port: 9092
+    zone: ap-south-1b-bangalore
+
+  - id: broker-blr-02
+    host: 10.15.2.21
+    port: 9092
+    zone: ap-south-1b-bangalore
+
+  - id: broker-del-01
+    host: 10.16.3.30
+    port: 9092
+    zone: ap-south-1c-delhi-edge
+
+topics:
+  # Mission-critical financial transaction stream requiring high availability across 3 zones
+  - name: juspay-payment-authorizations
+    partitions: 3
+    replicationFactor: 3
+    placementPolicy:
+      minDistinctZones: 3
+    config:
+      ackDefault: ALL_ISR
+      maxLagOffsets: "5"
+
+  # Asynchronous webhook dispatch queue with dual-zone fault tolerance
+  - name: merchant-webhook-events
+    partitions: 4
+    replicationFactor: 2
+    placementPolicy:
+      minDistinctZones: 2
+    config:
+      ackDefault: QUORUM_ISR
+      maxLagOffsets: "10"
+
+  # Immutable double-entry financial audit ledger
+  - name: financial-settlement-ledger
+    partitions: 2
+    replicationFactor: 3
+    placementPolicy:
+      minDistinctZones: 3
+    config:
+      ackDefault: ALL_ISR
+      maxLagOffsets: "3"
