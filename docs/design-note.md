@@ -35,7 +35,7 @@ This project implements an event streaming broker designed to solve these failur
 ### 3.2 Leader Election: Highest Log End Offset (Max-LEO) vs. Arbitrary Promotion
 - **Arbitrary / Round-Robin Election**: Promotes any surviving replica upon leader failure. This introduces silent data truncation if the elected node lagged behind the dead leader.
 - **Highest-LEO Election (`LeaderElector`)**: Filters candidate replicas strictly to alive members of the ISR set, evaluating each candidate's replicated Log End Offset (LEO). The candidate with the highest LEO is elected, advancing the leader epoch.
-- **Decision**: Adopt Max-LEO leader election. Combined with quorum write ACKs, this guarantees that mid-stream leader crashes yield zero acknowledged message loss.
+- **Decision**: Adopt Max-LEO leader election. Combined with quorum write ACKs, this ensures that mid-stream leader crashes yield zero acknowledged message loss in the simulated cluster.
 
 ### 3.3 Coordination & Metadata: In-Process Controller vs. Distributed Raft Quorum
 - **Distributed Raft Quorum (KRaft / etcd)**: Multi-node distributed state machine where controllers vote on metadata mutations. Requires separate consensus networking, term elections, and snapshotting.

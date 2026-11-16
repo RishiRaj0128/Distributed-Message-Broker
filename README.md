@@ -1,5 +1,6 @@
-# Distributed Message Broker — Resilient Multi-DC Event Streaming Platform
+# Distributed Message Broker — Simulated Multi-Zone Replication & Failover Engine
 
+[![CI](https://github.com/RishiRaj0128/Distributed-Message-Broker/actions/workflows/ci.yml/badge.svg)](https://github.com/RishiRaj0128/Distributed-Message-Broker/actions/workflows/ci.yml)
 [![Java 21](https://img.shields.io/badge/Java-21-orange.svg?style=for-the-badge&logo=openjdk)](https://www.oracle.com/java/)
 [![Maven 3.9](https://img.shields.io/badge/Maven-3.9.9-C71A36.svg?style=for-the-badge&logo=apachemaven)](https://maven.apache.org/)
 [![JUnit 5](https://img.shields.io/badge/JUnit-5.10.2-25A162.svg?style=for-the-badge&logo=junit5)](https://junit.org/junit5/)
@@ -27,9 +28,11 @@
 8. [Observability & Prometheus / Grafana Dashboard](#-observability--prometheus--grafana-dashboard)
 9. [Chaos Testing, Real Wall-Clock Timers & Split-Brain Invariant Proofs](#-chaos-testing-real-wall-clock-timers--split-brain-invariant-proofs)
 10. [CAP Theorem Tradeoff Analysis: Broker vs. Payment Engine](#-cap-theorem-tradeoff-analysis-broker-vs-payment-engine)
-11. [Defensible Interview & Resume Bullets (Zero Caveats)](#-defensible-interview--resume-bullets-zero-caveats)
+11. [Defensible Interview & Resume Bullets (Simulated In-Process Model)](#-defensible-interview--resume-bullets-simulated-in-process-model)
 12. [Simplifications Relative to Apache Kafka & Raft](#-simplifications-relative-to-apache-kafka--raft)
 13. [Build & Automated Test Suite Execution](#-build--automated-test-suite-execution)
+14. [Run in Docker (Single-Node Container)](#-run-in-docker-single-node-container)
+15. [Run the Failure Tests](#-run-the-failure-tests)
 
 ---
 
@@ -41,7 +44,7 @@ The **Distributed Message Broker** is a Kafka-style partitioned commit log and e
 - **Availability Target**: $99.999\%$ uptime via multi-DC replica placement.
 - **Failover Window**: $< 50\,\text{ms}$ bounded leader failover.
 - **Consistency**: Configurable durability (`LEADER_ONLY`, `QUORUM_ISR`, `ALL_ISR`).
-- **Data Loss Guarantee**: $0$ acknowledged messages lost during mid-stream leader crashes.
+- **Data Loss Guarantee**: $0$ acknowledged messages lost in the simulated cluster during mid-stream leader crashes.
 - **Split-Brain Immunity**: Strict majority quorum checks prevent dual active leaders under asymmetric network partitions.
 
 ---
@@ -78,7 +81,7 @@ The **Distributed Message Broker** is a Kafka-style partitioned commit log and e
                                        |  - Heartbeat failure detect  |
                                        |  - [LeaderElector] (Max LEO) |
                                        |  - [NetworkPartitionGuard]   |
-                                       |  - [BrokerMetrics] Exporter  |
+                                       |  - In-Process Registry & ISR |
                                        +------------------------------+
 ```
 
@@ -107,7 +110,9 @@ To ensure both **fast, hermetic CI verification** and **production-realistic wir
 |                     TIER 1: HERMETIC IN-PROCESS CONSENSUS ENGINE (Fast CI)                       |
 |  - Deterministic state machine simulating ISR expansion/shrinkage, Max-LEO leader election,      |
 |    and split-brain prevention without depending on non-deterministic external network jitter.     |
-|  - Executes 28 unit tests in ~5 seconds with reproducible mathematical guarantees.                |
+|  - Executes 32 tests across 12 classes in ~6 seconds with reproducible mathematical guarantees.   |
+|  - Note: Consensus, replication, and ISR management run in-process within a single JVM.           |
+|    Separate BrokerNodeMain OS processes do not form a multi-node cluster over TCP.               |
 +---------------------------------------------------------------------------------------------------+
                                                   |
                                                   v
@@ -284,6 +289,10 @@ Policies supported:
 
 Observability instrumentation is built on Micrometer and Prometheus:
 
+> **Honest Operational Status**: The metrics below are instrumented and thoroughly verified in
+> unit tests (`ObservabilityMetricsTest`), but `BrokerMetrics` is **not** currently wired into the
+> running `BrokerNodeMain` or exposed over an HTTP `/metrics` scrape endpoint.
+
 ### Core Exported Prometheus Metrics
 - `broker_messages_in_total` (Counter): Cumulative message ingress volume.
 - `broker_under_replicated_partitions` (Gauge): Partitions whose active ISR is below configured replication factor (primary alert trigger).
@@ -358,16 +367,16 @@ AVAILABILITY (A)             PARTITION TOLERANCE (P)
 
 ---
 
-## 💼 Defensible Interview & Resume Bullets (Zero Caveats)
+## 💼 Defensible Interview & Resume Bullets (Simulated In-Process Model)
 
 These bullets reflect the exact, verified reality of this repository and can be defended with total confidence in any deep technical interview:
 
-- **Distributed Broker & Multi-DC Architecture**: Designed and implemented a distributed Kafka-style message broker in Java 21 featuring partition commit logs, dynamic In-Sync Replica (ISR) tracking, and multi-zone fault domain placement to eliminate single datacenter failure domains.
-- **Failover & Zero Data Loss Guarantees**: Built an automated leader election engine promoting highest-replicated-offset (Max-LEO) ISR candidates; sustained **zero acknowledged message loss** and zero sequence gaps across **50+ simulated broker-failure cycles**.
-- **Real Background Clock Failure Detection**: Engineered failure detection with `ScheduledExecutorService` driving background heartbeat sweeps; demonstrated deterministic failover bounded within the configured heartbeat timeout ($\approx 500-600\,\text{ms}$ wall-clock window) upon leader silence.
-- **TCP Socket Wire Protocol**: Implemented real client-server networking using `java.net.ServerSocket` and `java.net.Socket` with length-prefixed framing for remote `PRODUCE`, `FETCH`, and cluster metadata discovery.
-- **Declarative Infrastructure DSL**: Created a YAML-based topology specification and reconciler (Terraform/Kubernetes pattern) that automatically provisions topics, enforces multi-zone replica spread, and flags under-replicated partitions without manual imperative commands.
-- **Split-Brain Elimination & Chaos Testing**: Implemented majority-quorum fencing in an asymmetric network partition simulator, proving that isolated minority leaders step down immediately to prevent dual active leaders.
+- **Simulated Multi-Zone Replica Placement**: Designed and implemented a Kafka-style partitioned message broker in Java 21 featuring in-memory commit logs, dynamic In-Sync Replica (ISR) tracking, and simulated multi-zone fault domain placement to model availability zone diversity without cross-datacenter infrastructure.
+- **Simulated Failover & Zero Acknowledged Data Loss**: Built an automated leader election engine promoting highest-replicated-offset (Max-LEO) ISR candidates; sustained **zero acknowledged message loss in the simulated cluster** and zero sequence gaps across **50+ simulated broker-failure cycles**.
+- **Real Background Clock Failure Detection**: Engineered failure detection with `ScheduledExecutorService` driving background heartbeat sweeps; demonstrated deterministic failover in the simulated cluster bounded within the configured heartbeat timeout ($\approx 500-600\,\text{ms}$ wall-clock window) upon leader silence.
+- **TCP Socket Wire Protocol**: Implemented client-server networking using `java.net.ServerSocket` and `java.net.Socket` with length-prefixed framing for remote `PRODUCE`, `FETCH`, duplicate suppression, and cluster metadata discovery against a local broker instance.
+- **Declarative Infrastructure DSL**: Created a YAML-based topology specification and reconciler (Terraform/Kubernetes pattern) that automatically provisions topics, enforces simulated multi-zone replica spread, and flags under-replicated partitions in memory.
+- **Split-Brain Elimination Under Simulated Partitions**: Implemented majority-quorum fencing in an asymmetric network partition simulator, proving that isolated minority leaders step down immediately to prevent dual active leaders in the simulated cluster.
 
 ---
 
@@ -384,6 +393,12 @@ To maintain academic and professional integrity, we explicitly document where th
 3. **Storage Tiering**:
    - *Kafka*: Segmented `.log` and `.index` files on persistent NVMe/SSD storage.
    - *This Implementation*: In-memory indexed commit logs with offset binary searching and segment truncation.
+4. **Multi-Node Inter-Process Replication**:
+   - *Kafka*: Replicas communicate over cross-host TCP connections.
+   - *This Implementation*: Replication and ISR tracking execute in-memory within a single JVM process; separate `BrokerNodeMain` OS processes each maintain an isolated in-memory registry and do not replicate to each other over TCP.
+5. **Observability Endpoint**:
+   - *Kafka*: JMX / Prometheus HTTP exporter exposed on a dedicated network port.
+   - *This Implementation*: `BrokerMetrics` verified in unit tests; exposing an HTTP `/metrics` endpoint is a future production roadmap item.
 
 ---
 
@@ -401,7 +416,7 @@ mvn clean test
 ### Complete Test Coverage Overview (32 Tests across 12 Suites)
 - [`CoreBrokerTest.java`](file:///d:/Distributed%20Message%20Broker/src/test/java/com/broker/core/CoreBrokerTest.java): CommitLog monotonic offsets, key hash partitioning, consumer offset commits.
 - [`ReplicationTest.java`](file:///d:/Distributed%20Message%20Broker/src/test/java/com/broker/replication/ReplicationTest.java): Quorum replication, `AckMode` validation, ISR lag expulsion and re-entry.
-- [`LeaderElectionTest.java`](file:///d:/Distributed%20Message%20Broker/src/test/java/com/broker/election/LeaderElectionTest.java): Highest-LEO leader election, bounded failover window, zero acknowledged data loss.
+- [`LeaderElectionTest.java`](file:///d:/Distributed%20Message%20Broker/src/test/java/com/broker/election/LeaderElectionTest.java): Highest-LEO leader election, bounded failover window, zero acknowledged data loss in the simulated cluster.
 - [`TimedRealFailoverStressTest.java`](file:///d:/Distributed%20Message%20Broker/src/test/java/com/broker/election/TimedRealFailoverStressTest.java): True background wall-clock heartbeat failure timing ($500\,\text{ms}$) via `ScheduledExecutorService`, plus 50+ continuous broker failure cycles.
 - [`IdempotentProducerConsumerTest.java`](file:///d:/Distributed%20Message%20Broker/src/test/java/com/broker/producer/IdempotentProducerConsumerTest.java): Sequence deduplication, gap detection, consumer replay idempotency.
 - [`ConsumerGroupRebalanceTest.java`](file:///d:/Distributed%20Message%20Broker/src/test/java/com/broker/consumer/ConsumerGroupRebalanceTest.java): Disjoint partition assignment, mid-stream consumer death rebalancing.
@@ -411,3 +426,42 @@ mvn clean test
 - [`MultiDcPlacementTest.java`](file:///d:/Distributed%20Message%20Broker/src/test/java/com/broker/topology/MultiDcPlacementTest.java): Multi-AZ fault domain auditing, whole datacenter outage survivability.
 - [`ChaosFailureTest.java`](file:///d:/Distributed%20Message%20Broker/src/test/java/com/broker/chaos/ChaosFailureTest.java): Network partition injection, minority leader step-down, split-brain immunity.
 - [`RealSocketNetworkingTest.java`](file:///d:/Distributed%20Message%20Broker/src/test/java/com/broker/net/RealSocketNetworkingTest.java): Real `ServerSocket` and `Socket` wire protocol tests for produce, fetch, metadata query, and duplicate suppression.
+
+---
+
+## 🐳 Run in Docker (Single-Node Container)
+
+The broker is containerized via a multi-stage `Dockerfile` (`maven:3.9.9-eclipse-temurin-21` -> `eclipse-temurin:21-jre`) running as a non-root user (`broker`, UID 10001) with a real TCP socket healthcheck.
+
+Because `BrokerNodeMain` binds strictly to the loopback interface `127.0.0.1` inside the container, client interactions are executed directly inside the container namespace:
+
+```bash
+# 1. Build and start the broker container in the background
+docker compose up -d
+
+# 2. Verify health status (waits for TCP 127.0.0.1:9092)
+docker compose ps
+
+# 3. Query cluster partition metadata
+docker compose exec broker java -cp "/app/app.jar:/app/lib/*" com.broker.BrokerClientMain 127.0.0.1 9092 metadata payments 0
+
+# 4. Produce a message over the real TCP socket
+docker compose exec broker java -cp "/app/app.jar:/app/lib/*" com.broker.BrokerClientMain 127.0.0.1 9092 produce payments 0 producer-01 "DEMO_PAYLOAD_TX_1001"
+
+# 5. Fetch the committed message back from the partition log
+docker compose exec broker java -cp "/app/app.jar:/app/lib/*" com.broker.BrokerClientMain 127.0.0.1 9092 fetch payments 0 0
+
+# 6. Stop and remove the container
+docker compose down
+```
+
+---
+
+## 🔬 Run the Failure Tests
+
+Detailed test commands, assertions, and invariant breakdowns are documented in [`docs/failure-tests.md`](docs/failure-tests.md).
+To run the complete automated test suite and all three headline resilience tests while capturing raw console evidence to `docs/evidence/`, run:
+
+```bash
+bash scripts/collect-evidence.sh
+```
