@@ -1,0 +1,16 @@
+---
+# Docker Compose configuration for Distributed Message Broker (Single Node)
+# Note: BrokerNodeMain binds strictly to 127.0.0.1. Client commands run via:
+#   docker compose exec broker java -cp "/app/app.jar:/app/lib/*" ...
+services:
+  broker:
+    image: distributed-message-broker:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: distributed-message-broker
+    command: ["broker-01", "9092", "ap-south-1a"]
+    deploy:
+      resources:
+        limits:
+          memory: 512M
